@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 )
 
 var (
 	progName string  // The name of this executable.
 	subCmd   command // The active sub-command.
 
-	dbPath    = "data.db" // The path to the DB file.
-	cmdHandle string      // The handle for the cmd to modify or execute.
+	dbPath    = "data.db"   // The path to the DB file.
+	cmdHandle string        // The handle for the external cmd.
+	cmdInfo   *data.Command // The external command data.
 )
 
 // command is the type of a valid sub-command.
@@ -75,22 +78,22 @@ func init() {
 
 // initCmdDelete parses arguments specific to sub-command 'delete'.
 func initCmdDelete(args []string) {
-	if len(args) == 0 {
+	if len(args) != 1 {
 		fmt.Fprintf(os.Stderr, "Usage: delete <cmd name>\n")
 		os.Exit(2)
 	}
 
-	cmdHandle = args[len(args)-1]
+	cmdHandle = args[0]
 }
 
 // initCmdRun parses arguments specific to sub-command 'run'.
 func initCmdRun(args []string) {
-	if len(args) == 0 {
+	if len(args) != 1 {
 		fmt.Fprintf(os.Stderr, "Usage: run <cmd name>\n")
 		os.Exit(2)
 	}
 
-	cmdHandle = args[len(args)-1]
+	cmdHandle = args[0]
 }
 
 // initCmdSave parses arguments specific to sub-command 'save'.
@@ -99,10 +102,19 @@ func initCmdSave(args []string) {
 
 	flags.StringVar(&cmdHandle, "name", "", "The name used to refer to the saved cmd")
 
-	if err := flags.Parse(args); err != nil || cmdHandle == "" {
+	err := flags.Parse(args)
+	cmdArgs := flags.Args()
+	if err != nil || cmdHandle == "" || len(cmdArgs) < 1 {
 		fmt.Fprintf(os.Stderr, "Usage: save -name <name> <cmd> [<cmd args>, ...]\n")
 		flags.PrintDefaults()
 		os.Exit(2)
+	}
+
+	// Init the external command struct.
+	cmdInfo = &data.Command{}
+	cmdInfo.Name = cmdArgs[0]
+	if len(cmdArgs) > 1 {
+		cmdInfo.Args = cmdArgs[1:]
 	}
 }
 
@@ -117,7 +129,7 @@ func main() {
 	case runCommand:
 		status = doCmdRun()
 	case saveCommand:
-		// TODO
+		status = doCmdSave()
 	}
 	os.Exit(status)
 }

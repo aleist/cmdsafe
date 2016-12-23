@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package cmdsafe;
+option go_package = "data";
+
+message Config {
+  ScryptConfig scrypt = 1;
+}
+
+message ScryptConfig {
+  bytes salt = 1;
+  int64 n = 2;
+  int32 r = 3;
+  int32 p = 4;
+}
+
+message Command {
+  string name = 1;
+  repeated string args = 2;
+}

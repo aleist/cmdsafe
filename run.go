@@ -8,11 +8,23 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+
+	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 )
 
-// doCmdRun performs sub-command 'run'.
+// doCmdRun performs sub-command 'run' and returns an exit status.
 func doCmdRun() int {
-	status := runCmd("sleep", "5s") // TODO pass cmdName and args
+	// Load command from DB.
+	// TODO
+
+	// Parse command info.
+	cmdInfo = &data.Command{}
+	// TODO
+	cmdInfo.Name = "ls"
+	cmdInfo.Args = []string{"-l"}
+
+	// Run the command.
+	status := runCmd(cmdInfo.GetName(), cmdInfo.GetArgs()...)
 	return status
 }
 
