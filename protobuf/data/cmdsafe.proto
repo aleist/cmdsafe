@@ -4,7 +4,8 @@ package cmdsafe;
 option go_package = "data";
 
 message Config {
-  ScryptConfig scrypt = 1;
+  bytes hash = 1;
+  ScryptConfig scrypt = 2;
 }
 
 message ScryptConfig {
