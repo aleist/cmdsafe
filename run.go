@@ -9,30 +9,32 @@ import (
 	"os/signal"
 	"syscall"
 
+	"fmt"
+
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 )
 
-// doCmdRun performs sub-command 'run' and returns an exit status.
-func doCmdRun() int {
+// doCmdRun executes sub-command 'run' and returns the spawned process' exit
+// status in addition to any other errors.
+func doCmdRun() (int, error) {
 	// Load command from DB.
 	// TODO
 
 	// Parse command info.
-	cmdInfo = &data.Command{}
+	cmdConfig = &data.Command{}
 	// TODO
-	cmdInfo.Name = "ls"
-	cmdInfo.Args = []string{"-l"}
+	cmdConfig.Name = "ls"
+	cmdConfig.Args = []string{"-l"}
 
 	// Run the command.
-	status := runCmd(cmdInfo.GetName(), cmdInfo.GetArgs()...)
-	return status
+	return runCmd(cmdConfig.GetName(), cmdConfig.GetArgs()...)
 }
 
 // runCmd calls runCmdAsync and waits for the child process to complete. Listens
 // for interrupts SIGINT and SIGTERM and forwards them to the child.
 //
-// Attempts to return the process' exit status.
-func runCmd(cmdName string, arg ...string) int {
+// Attempts to return the process' exit status in addition to the error if any.
+func runCmd(cmdName string, arg ...string) (int, error) {
 	// Disable default behaviour and pass SIGINT and SIGTERM to child process.
 	interruptCh := make(chan os.Signal, 1)
 	signal.Notify(interruptCh, os.Interrupt, syscall.SIGTERM)
@@ -40,28 +42,23 @@ func runCmd(cmdName string, arg ...string) int {
 	// Start the requested process.
 	exitCh, err := runCmdAsync(interruptCh, cmdName, arg...)
 	if err != nil {
-		log.Printf("%s failed to start: %v", cmdHandle, err)
-		return 1
+		return 1, fmt.Errorf("%s failed to start: %v", cmdHandle, err)
 	}
 
-	// Wait for the child process to exit.
+	// Wait for the process to exit.
 	var exitStatus int
 	err = <-exitCh
 	if err != nil {
-		log.Printf("%s exited with error: %v", cmdHandle, err)
 		// Try to determine the exit status of the child process.
-		switch err := err.(type) {
-		case *exec.ExitError:
+		exitStatus = 1 // Unknown reason.
+		if err, ok := err.(*exec.ExitError); ok {
 			if s, ok := err.Sys().(syscall.WaitStatus); ok {
 				exitStatus = s.ExitStatus()
-			} else {
-				exitStatus = 1
 			}
-		default:
-			exitStatus = 1 // Unknown reason.
 		}
+		err = fmt.Errorf("%s exited with error: %v", cmdHandle, err)
 	}
-	return exitStatus
+	return exitStatus, err
 }
 
 // runCmdAsync starts a new process cmdName, passing arguments and connecting

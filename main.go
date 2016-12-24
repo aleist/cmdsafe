@@ -6,7 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"log"
+
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
+	"github.com/boltdb/bolt"
 )
 
 var (
@@ -15,7 +18,9 @@ var (
 
 	dbPath    = "data.db"   // The path to the DB file.
 	cmdHandle string        // The handle for the external cmd.
-	cmdInfo   *data.Command // The external command data.
+	cmdConfig *data.Command // The external command data.
+
+	saveConfig *saveOptions // saveCommand specific options.
 )
 
 // command is the type of a valid sub-command.
@@ -100,36 +105,67 @@ func initCmdRun(args []string) {
 func initCmdSave(args []string) {
 	flags := flag.NewFlagSet("save", flag.ExitOnError)
 
+	saveConfig = &saveOptions{}
+
 	flags.StringVar(&cmdHandle, "name", "", "The name used to refer to the saved cmd")
+	flags.BoolVar(&saveConfig.Replace, "r", false, "Replace existing entry with the given name")
 
 	err := flags.Parse(args)
 	cmdArgs := flags.Args()
 	if err != nil || cmdHandle == "" || len(cmdArgs) < 1 {
-		fmt.Fprintf(os.Stderr, "Usage: save -name <name> <cmd> [<cmd args>, ...]\n")
+		fmt.Fprintf(os.Stderr, "Usage: save [-r] -name <name> <cmd> [<cmd args>, ...]\n")
 		flags.PrintDefaults()
 		os.Exit(2)
 	}
 
 	// Init the external command struct.
-	cmdInfo = &data.Command{}
-	cmdInfo.Name = cmdArgs[0]
+	cmdConfig = &data.Command{}
+	cmdConfig.Name = cmdArgs[0]
 	if len(cmdArgs) > 1 {
-		cmdInfo.Args = cmdArgs[1:]
+		cmdConfig.Args = cmdArgs[1:]
 	}
 }
 
 func main() {
 	// Run the selected sub-command.
 	var status int
+	var err error
 	switch subCmd {
 	case deleteCommand:
 		// TODO
 	case listCommand:
 		// TODO
 	case runCommand:
-		status = doCmdRun()
+		status, err = doCmdRun()
 	case saveCommand:
-		status = doCmdSave()
+		err = doCmdSave()
+	}
+	if err != nil {
+		log.Print(err)
+	}
+
+	if status == 0 && err != nil {
+		os.Exit(1)
 	}
 	os.Exit(status)
+}
+
+// accessDB opens the database in either readwrite or readonly mode and passes
+// the instance to function fn. The database is closed and all resources
+// released when fn returns.
+//
+// The returned error may be from the database access or from fn, whichever
+// occurs first.
+func accessDB(readonly bool, fn func(*bolt.DB) error) (err error) {
+	db, err := bolt.Open(dbPath, 0600, &bolt.Options{ReadOnly: readonly})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if e := db.Close(); err == nil { // Return the first error encountered.
+			err = e
+		}
+	}()
+
+	return fn(db)
 }
