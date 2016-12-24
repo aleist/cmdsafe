@@ -3,31 +3,67 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
 
-	"fmt"
-
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
+	"github.com/boltdb/bolt"
+	"github.com/golang/protobuf/proto"
 )
 
 // doCmdRun executes sub-command 'run' and returns the spawned process' exit
 // status in addition to any other errors.
-func doCmdRun() (int, error) {
+func doCmdRun(handle string) (int, error) {
 	// Load command from DB.
-	// TODO
+	encryptedCmd, err := loadCommand([]byte(handle))
+	if err != nil {
+		return 1, err
+	}
 
-	// Parse command info.
+	// TODO decrypt
+	cmdMsg := encryptedCmd
+
+	// Parse the Command info.
 	cmdConfig = &data.Command{}
-	// TODO
-	cmdConfig.Name = "ls"
-	cmdConfig.Args = []string{"-l"}
+	if err := proto.Unmarshal(cmdMsg, cmdConfig); err != nil {
+		return 1, fmt.Errorf("cannot read the command config: %v", err)
+	}
 
 	// Run the command.
-	return runCmd(cmdConfig.GetName(), cmdConfig.GetArgs()...)
+	status, err := runCmd(cmdConfig.GetName(), cmdConfig.GetArgs()...)
+	if err != nil {
+		return status, fmt.Errorf("%s %v", handle, err)
+	}
+	return status, nil
+}
+
+// loadCommand loads the command data stored in the DB under handle.
+func loadCommand(handle []byte) ([]byte, error) {
+	entryNotFoundError := fmt.Errorf("%s not found", handle)
+
+	var data []byte
+	err := accessDB(true, func(db *bolt.DB) error {
+		return db.View(func(tx *bolt.Tx) error {
+			cmdBucket := tx.Bucket([]byte(commandBucketName))
+			if cmdBucket == nil {
+				return entryNotFoundError
+			}
+
+			cmdData := cmdBucket.Get(handle)
+			if cmdData == nil {
+				return entryNotFoundError
+			}
+			data = append(data, cmdData...)
+
+			return nil
+		})
+	})
+
+	return data, err
 }
 
 // runCmd calls runCmdAsync and waits for the child process to complete. Listens
@@ -42,7 +78,7 @@ func runCmd(cmdName string, arg ...string) (int, error) {
 	// Start the requested process.
 	exitCh, err := runCmdAsync(interruptCh, cmdName, arg...)
 	if err != nil {
-		return 1, fmt.Errorf("%s failed to start: %v", cmdHandle, err)
+		return 1, fmt.Errorf("failed to start: %v", err)
 	}
 
 	// Wait for the process to exit.
@@ -56,7 +92,7 @@ func runCmd(cmdName string, arg ...string) (int, error) {
 				exitStatus = s.ExitStatus()
 			}
 		}
-		err = fmt.Errorf("%s exited with error: %v", cmdHandle, err)
+		err = fmt.Errorf("exited with error: %v", err)
 	}
 	return exitStatus, err
 }
@@ -106,7 +142,7 @@ func runCmdAsync(signalCh <-chan os.Signal, cmdName string, arg ...string) (<-ch
 			case s := <-signalCh:
 				err := cmd.Process.Signal(s)
 				if err != nil {
-					log.Printf("Failed to forward signal to %s: %v", cmdHandle, err)
+					log.Printf("Failed to forward signal to child process: %v", err)
 				}
 			case <-waitCh:
 				done = true

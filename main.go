@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
-
-	"log"
+	"time"
 
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 	"github.com/boltdb/bolt"
@@ -32,6 +32,12 @@ const (
 	listCommand   command = "list"
 	runCommand    command = "run"
 	saveCommand   command = "save"
+)
+
+// Database constants.
+const (
+	configBucketName  = "config"  // The config bucket.
+	commandBucketName = "command" // The command data bucket.
 )
 
 func init() {
@@ -136,9 +142,9 @@ func main() {
 	case listCommand:
 		// TODO
 	case runCommand:
-		status, err = doCmdRun()
+		status, err = doCmdRun(cmdHandle)
 	case saveCommand:
-		err = doCmdSave()
+		err = doCmdSave(cmdHandle, saveConfig)
 	}
 	if err != nil {
 		log.Print(err)
@@ -157,7 +163,7 @@ func main() {
 // The returned error may be from the database access or from fn, whichever
 // occurs first.
 func accessDB(readonly bool, fn func(*bolt.DB) error) (err error) {
-	db, err := bolt.Open(dbPath, 0600, &bolt.Options{ReadOnly: readonly})
+	db, err := bolt.Open(dbPath, 0600, &bolt.Options{ReadOnly: readonly, Timeout: 5 * time.Second})
 	if err != nil {
 		return err
 	}
@@ -168,4 +174,15 @@ func accessDB(readonly bool, fn func(*bolt.DB) error) (err error) {
 	}()
 
 	return fn(db)
+}
+
+// createBuckets creates the top-level buckets in db if they do not exist.
+func createBuckets(db *bolt.DB) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(commandBucketName))
+		if err == nil {
+			_, err = tx.CreateBucketIfNotExists([]byte(configBucketName))
+		}
+		return err
+	})
 }
