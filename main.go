@@ -13,20 +13,14 @@ import (
 )
 
 var (
-	progName string  // The name of this executable.
-	subCmd   command // The active sub-command.
-
-	dbPath    = "data.db"   // The path to the DB file.
-	cmdHandle string        // The handle for the external cmd.
-	cmdConfig *data.Command // The external command data.
-
-	saveConfig *saveOptions // saveCommand specific options.
+	progName string      // The name of this executable.
+	dbPath   = "data.db" // The path to the DB file.
 )
 
-// command is the type of a valid sub-command.
+// command is the type of a valid subcommand.
 type command string
 
-// Valid sub-commands.
+// Valid subcommands.
 const (
 	deleteCommand command = "delete"
 	listCommand   command = "list"
@@ -40,7 +34,44 @@ const (
 	commandBucketName = "command" // The command data bucket.
 )
 
-func init() {
+func main() {
+	// Parse global arguments.
+	subcmd, subargs := parseArgs()
+
+	// Parse subcommand arguments and run it.
+	var status int
+	var err error
+	switch subcmd {
+	case deleteCommand:
+		_ = parseArgsCmdDelete(subargs)
+		// TODO
+	case listCommand:
+		// No arguments to parse.
+		// TODO
+	case runCommand:
+		cmdHandle := parseArgsCmdRun(subargs)
+		status, err = doCmdRun(cmdHandle)
+	case saveCommand:
+		cmdHandle, cmdData, config := parseArgsCmdSave(subargs)
+		err = doCmdSave(cmdHandle, cmdData, config)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", subcmd)
+		flag.Usage()
+		os.Exit(2)
+	}
+	if err != nil {
+		log.Print(err)
+	}
+
+	if status == 0 && err != nil {
+		os.Exit(1)
+	}
+	os.Exit(status)
+}
+
+// parseArgs parses the global command line arguments and returns the specified
+// subcommand and its unparsed arguments.
+func parseArgs() (command, []string) {
 	// Extract the program name from the path.
 	path := strings.Split(os.Args[0], string(os.PathSeparator))
 	progName = path[len(path)-1]
@@ -61,60 +92,45 @@ func init() {
 	flag.StringVar(&dbPath, "db", dbPath, "The database `path`")
 	flag.Parse()
 
-	// Parse sub-command name and arguments.
+	// Extract the subcommand.
 	args := flag.Args()
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "Error: missing command name\n")
 		flag.Usage()
 		os.Exit(2)
 	}
-	switch command(args[0]) {
-	case deleteCommand:
-		subCmd = deleteCommand
-		initCmdDelete(args[1:])
-	case listCommand:
-		subCmd = listCommand
-	case runCommand:
-		subCmd = runCommand
-		initCmdRun(args[1:])
-	case saveCommand:
-		subCmd = saveCommand
-		initCmdSave(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", args[0])
-		flag.Usage()
-		os.Exit(2)
-	}
+	return command(args[0]), args[1:]
 }
 
-// initCmdDelete parses arguments specific to sub-command 'delete'.
-func initCmdDelete(args []string) {
+// parseArgsCmdDelete parses arguments specific to subcommand 'delete'. Returns
+// the handle for the external command to be deleted.
+func parseArgsCmdDelete(args []string) (cmdHandle string) {
 	if len(args) != 1 {
 		fmt.Fprintf(os.Stderr, "Usage: delete <cmd name>\n")
 		os.Exit(2)
 	}
-
-	cmdHandle = args[0]
+	return args[0]
 }
 
-// initCmdRun parses arguments specific to sub-command 'run'.
-func initCmdRun(args []string) {
+// parseArgsCmdRun parses arguments specific to subcommand 'run'. Returns the
+// handle for the external command to be run.
+func parseArgsCmdRun(args []string) (cmdHandle string) {
 	if len(args) != 1 {
 		fmt.Fprintf(os.Stderr, "Usage: run <cmd name>\n")
 		os.Exit(2)
 	}
-
-	cmdHandle = args[0]
+	return args[0]
 }
 
-// initCmdSave parses arguments specific to sub-command 'save'.
-func initCmdSave(args []string) {
+// parseArgsCmdSave parses arguments specific to subcommand 'save'. Returns the
+// handle for the external command to be saved, its data and the save config.
+func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *data.Command, config *saveOptions) {
 	flags := flag.NewFlagSet("save", flag.ExitOnError)
 
-	saveConfig = &saveOptions{}
+	config = &saveOptions{}
 
 	flags.StringVar(&cmdHandle, "name", "", "The name used to refer to the saved cmd")
-	flags.BoolVar(&saveConfig.Replace, "r", false, "Replace existing entry with the given name")
+	flags.BoolVar(&config.Replace, "r", false, "Replace existing entry with the given name")
 
 	err := flags.Parse(args)
 	cmdArgs := flags.Args()
@@ -125,35 +141,13 @@ func initCmdSave(args []string) {
 	}
 
 	// Init the external command struct.
-	cmdConfig = &data.Command{}
-	cmdConfig.Name = cmdArgs[0]
+	cmdData = &data.Command{}
+	cmdData.Name = cmdArgs[0]
 	if len(cmdArgs) > 1 {
-		cmdConfig.Args = cmdArgs[1:]
-	}
-}
-
-func main() {
-	// Run the selected sub-command.
-	var status int
-	var err error
-	switch subCmd {
-	case deleteCommand:
-		// TODO
-	case listCommand:
-		// TODO
-	case runCommand:
-		status, err = doCmdRun(cmdHandle)
-	case saveCommand:
-		err = doCmdSave(cmdHandle, saveConfig)
-	}
-	if err != nil {
-		log.Print(err)
+		cmdData.Args = cmdArgs[1:]
 	}
 
-	if status == 0 && err != nil {
-		os.Exit(1)
-	}
-	os.Exit(status)
+	return cmdHandle, cmdData, config
 }
 
 // accessDB opens the database in either readwrite or readonly mode and passes

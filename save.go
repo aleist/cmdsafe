@@ -1,10 +1,11 @@
-// This file implements sub-command 'save'.
+// This file implements subcommand 'save'.
 
 package main
 
 import (
 	"fmt"
 
+	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -13,10 +14,11 @@ type saveOptions struct {
 	Replace bool // Replace existing value.
 }
 
-// doCmdSave executes sub-command 'save' for the command identified by handle.
-func doCmdSave(handle string, config *saveOptions) error {
+// doCmdSave executes subcommand 'save', storing cmdData in encrypted form with
+// handle as its identifier.
+func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error {
 	// Serialise the Command proto.
-	cmdMsg, err := proto.Marshal(cmdConfig)
+	cmdMsg, err := proto.Marshal(cmdData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal the command config: %v", err)
 	}
@@ -28,7 +30,7 @@ func doCmdSave(handle string, config *saveOptions) error {
 	return accessDB(false, writeCommand([]byte(handle), encryptedCmd, config))
 }
 
-// writeCommand returns a closure that stores cmdData under handle in the DB.
+// writeCommand returns a closure that saves cmdData under key handle in the DB.
 func writeCommand(handle, cmdData []byte, config *saveOptions) func(*bolt.DB) error {
 	return func(db *bolt.DB) error {
 		if err := createBuckets(db); err != nil {

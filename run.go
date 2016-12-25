@@ -1,4 +1,4 @@
-// This file implements sub-command 'run'.
+// This file implements subcommand 'run'.
 
 package main
 
@@ -15,7 +15,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// doCmdRun executes sub-command 'run' and returns the spawned process' exit
+// doCmdRun executes subcommand 'run' and returns the spawned process' exit
 // status in addition to any other errors.
 func doCmdRun(handle string) (int, error) {
 	// Load command from DB.
@@ -27,14 +27,14 @@ func doCmdRun(handle string) (int, error) {
 	// TODO decrypt
 	cmdMsg := encryptedCmd
 
-	// Parse the Command info.
-	cmdConfig = &data.Command{}
-	if err := proto.Unmarshal(cmdMsg, cmdConfig); err != nil {
+	// Parse the command data.
+	cmdData := &data.Command{}
+	if err := proto.Unmarshal(cmdMsg, cmdData); err != nil {
 		return 1, fmt.Errorf("cannot read the command config: %v", err)
 	}
 
 	// Run the command.
-	status, err := runCmd(cmdConfig.GetName(), cmdConfig.GetArgs()...)
+	status, err := runCmd(cmdData.GetName(), cmdData.GetArgs()...)
 	if err != nil {
 		return status, fmt.Errorf("%s %v", handle, err)
 	}
@@ -45,7 +45,7 @@ func doCmdRun(handle string) (int, error) {
 func loadCommand(handle []byte) ([]byte, error) {
 	entryNotFoundError := fmt.Errorf("%s not found", handle)
 
-	var data []byte
+	var cmdData []byte
 	err := accessDB(true, func(db *bolt.DB) error {
 		return db.View(func(tx *bolt.Tx) error {
 			cmdBucket := tx.Bucket([]byte(commandBucketName))
@@ -53,17 +53,17 @@ func loadCommand(handle []byte) ([]byte, error) {
 				return entryNotFoundError
 			}
 
-			cmdData := cmdBucket.Get(handle)
-			if cmdData == nil {
+			val := cmdBucket.Get(handle)
+			if val == nil {
 				return entryNotFoundError
 			}
-			data = append(data, cmdData...)
+			cmdData = append(cmdData, val...)
 
 			return nil
 		})
 	})
 
-	return data, err
+	return cmdData, err
 }
 
 // runCmd calls runCmdAsync and waits for the child process to complete. Listens
