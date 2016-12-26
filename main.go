@@ -43,8 +43,8 @@ func main() {
 	var err error
 	switch subcmd {
 	case deleteCommand:
-		_ = parseArgsCmdDelete(subargs)
-		// TODO
+		cmdHandle := parseArgsCmdDelete(subargs)
+		err = doCmdDelete(cmdHandle)
 	case listCommand:
 		// No arguments to parse.
 		err = doCmdList()
