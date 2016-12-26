@@ -47,7 +47,7 @@ func main() {
 		// TODO
 	case listCommand:
 		// No arguments to parse.
-		// TODO
+		err = doCmdList()
 	case runCommand:
 		cmdHandle := parseArgsCmdRun(subargs)
 		status, err = doCmdRun(cmdHandle)
