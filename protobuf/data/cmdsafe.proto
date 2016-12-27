@@ -19,3 +19,9 @@ message Command {
   string name = 1;
   repeated string args = 2;
 }
+
+message CryptoEnvelope {
+  bytes hmac = 1; // The hmac of iv+data (in this order).
+  bytes iv = 2;   // The initialization vector.
+  bytes data = 3; // The encrypted data.
+}
