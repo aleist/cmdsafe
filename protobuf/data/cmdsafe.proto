@@ -16,8 +16,9 @@ message ScryptConfig {
 }
 
 message Command {
-  string name = 1;
-  repeated string args = 2;
+  string name = 1;          // A handle used to refer to this command.
+  string executable = 2;    // The command executable.
+  repeated string args = 3; // The command arguments.
 }
 
 message CryptoEnvelope {

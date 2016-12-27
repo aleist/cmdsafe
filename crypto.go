@@ -145,7 +145,7 @@ func DecryptCommand(env *data.CryptoEnvelope, key CryptoKey, fn DecryptFn,
 		return nil, err
 	}
 	if !hmac.Equal(sig, env.Hmac) {
-		return nil, fmt.Errorf("failed to establish data integrity: invalid HMAC")
+		return nil, fmt.Errorf("invalid signature, the data may have been tempered with")
 	}
 
 	// Decrypt the data.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 	"github.com/boltdb/bolt"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -142,7 +144,8 @@ func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *data.Command, c
 
 	// Init the external command struct.
 	cmdData = &data.Command{}
-	cmdData.Name = cmdArgs[0]
+	cmdData.Name = cmdHandle
+	cmdData.Executable = cmdArgs[0]
 	if len(cmdArgs) > 1 {
 		cmdData.Args = cmdArgs[1:]
 	}
@@ -179,4 +182,36 @@ func createBuckets(db *bolt.DB) error {
 		}
 		return err
 	})
+}
+
+// requestPassword aks the user to enter a password once if repeat is false or
+// twice if repeat is true. Returns the password if all attempts are match.
+func requestPassword(repeat bool) ([]byte, error) {
+	fd := int(os.Stdin.Fd())
+	state, err := terminal.GetState(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Listen for interrupts to ensure the terminal is reset before we quit.
+	// TODO
+	defer terminal.Restore(fd, state)
+
+	fmt.Print("Enter password: ")
+	pwd, err := terminal.ReadPassword(fd)
+	fmt.Println()
+	if err != nil {
+		return nil, err
+	}
+
+	if repeat {
+		fmt.Print("Repeat password: ")
+		pwd2, err := terminal.ReadPassword(fd)
+		fmt.Println()
+		if err != nil || bytes.Compare(pwd, pwd2) != 0 {
+			return nil, fmt.Errorf("passwords do not match")
+		}
+	}
+
+	return pwd, nil
 }

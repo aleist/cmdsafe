@@ -3,6 +3,8 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"os"
@@ -18,23 +20,49 @@ import (
 // doCmdRun executes subcommand 'run' and returns the spawned process' exit
 // status in addition to any other errors.
 func doCmdRun(handle string) (int, error) {
-	// Load command from DB.
-	encryptedCmd, err := loadCommand([]byte(handle))
+	pwd, err := requestPassword(false)
 	if err != nil {
 		return 1, err
 	}
 
-	// TODO decrypt
-	cmdMsg := encryptedCmd
+	// Load the global config.
+	globalConfig := &data.Config{} // TODO
+	scryptConfig := globalConfig.Scrypt
 
-	// Parse the command data.
-	cmdData := &data.Command{}
-	if err := proto.Unmarshal(cmdMsg, cmdData); err != nil {
-		return 1, fmt.Errorf("cannot read the command config: %v", err)
+	// Verify the hash of the derived crypto key against the stored hash.
+	key, err := NewScryptKey(pwd, scryptConfig.Salt,
+		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
+	if err != nil {
+		return 1, err
+	}
+	if bytes.Compare(key.Hash(), globalConfig.Hash) != 0 {
+		return 1, fmt.Errorf("incorrect password")
+	}
+
+	// Load and parse the crypto envelope.
+	cryptoEnvMsg, err := loadCommand([]byte(handle))
+	if err != nil {
+		return 1, err
+	}
+	cryptoEnv := &data.CryptoEnvelope{}
+	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil {
+		return 1, fmt.Errorf("failed to deserialise the crypto envelope: %v", err)
+	}
+
+	// Decrypt the command data.
+	cmdData, err := DecryptCommand(cryptoEnv, key, DecryptAESCTR, sha256.New)
+	if err != nil {
+		return 1, err
+	}
+
+	// Verify that the stored command name matches the handle to ensure the DB
+	// has not been tampered with and the command belongs to a different handle.
+	if cmdData.Name != handle {
+		return 1, fmt.Errorf("command name mismatch, the database may have been tempered with")
 	}
 
 	// Run the command.
-	status, err := runCmd(cmdData.GetName(), cmdData.GetArgs()...)
+	status, err := runCmd(cmdData.Executable, cmdData.Args...)
 	if err != nil {
 		return status, fmt.Errorf("%s %v", handle, err)
 	}
@@ -45,7 +73,7 @@ func doCmdRun(handle string) (int, error) {
 func loadCommand(handle []byte) ([]byte, error) {
 	entryNotFoundError := fmt.Errorf("%s not found", handle)
 
-	var cmdData []byte
+	var value []byte
 	err := accessDB(true, func(db *bolt.DB) error {
 		return db.View(func(tx *bolt.Tx) error {
 			cmdBucket := tx.Bucket([]byte(commandBucketName))
@@ -57,13 +85,13 @@ func loadCommand(handle []byte) ([]byte, error) {
 			if val == nil {
 				return entryNotFoundError
 			}
-			cmdData = append(cmdData, val...)
+			value = append(value, val...)
 
 			return nil
 		})
 	})
 
-	return cmdData, err
+	return value, err
 }
 
 // runCmd calls runCmdAsync and waits for the child process to complete. Listens

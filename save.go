@@ -3,6 +3,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
@@ -17,21 +18,39 @@ type saveOptions struct {
 // doCmdSave executes subcommand 'save', storing cmdData in encrypted form with
 // handle as its identifier.
 func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error {
-	// Serialise the Command proto.
-	cmdMsg, err := proto.Marshal(cmdData)
+	pwd, err := requestPassword(true)
 	if err != nil {
-		return fmt.Errorf("failed to marshal the command config: %v", err)
+		return err
 	}
 
-	// TODO encrypt
-	encryptedCmd := cmdMsg
+	// Load the global config.
+	globalConfig := &data.Config{} // TODO
+	scryptConfig := globalConfig.Scrypt
+
+	// Encrypt the command data.
+	key, err := NewScryptKey(pwd, scryptConfig.Salt,
+		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
+	if err != nil {
+		return err
+	}
+	cryptoEnv, err := EncryptCommand(cmdData, key, EncryptAESCTR, sha256.New)
+	if err != nil {
+		return err
+	}
+
+	// Serialise the crypto envelope.
+	cryptoEnvMsg, err := proto.Marshal(cryptoEnv)
+	if err != nil {
+		return fmt.Errorf("failed to serialise the crypto envelope: %v", err)
+	}
 
 	// Write to DB.
-	return accessDB(false, writeCommand([]byte(handle), encryptedCmd, config))
+	return accessDB(false, writeCommand([]byte(handle), cryptoEnvMsg, config))
 }
 
-// writeCommand returns a closure that saves cmdData under key handle in the DB.
-func writeCommand(handle, cmdData []byte, config *saveOptions) func(*bolt.DB) error {
+// writeCommand returns a closure that saves the command data value under key
+// handle in the DB.
+func writeCommand(handle, value []byte, config *saveOptions) func(*bolt.DB) error {
 	return func(db *bolt.DB) error {
 		if err := createBuckets(db); err != nil {
 			return err
@@ -46,7 +65,7 @@ func writeCommand(handle, cmdData []byte, config *saveOptions) func(*bolt.DB) er
 				return fmt.Errorf("cannot replace existing entry for %s without -r flag", handle)
 			}
 
-			return cmdBucket.Put(handle, cmdData)
+			return cmdBucket.Put(handle, value)
 		})
 	}
 }
