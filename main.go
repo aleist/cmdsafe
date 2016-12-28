@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
@@ -194,8 +196,15 @@ func requestPassword(repeat bool) ([]byte, error) {
 	}
 
 	// Listen for interrupts to ensure the terminal is reset before we quit.
-	// TODO
-	defer terminal.Restore(fd, state)
+	interruptCh := make(chan os.Signal, 1)
+	signal.Notify(interruptCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		_, interrupted := <-interruptCh
+		terminal.Restore(fd, state)
+		if interrupted {
+			os.Exit(1)
+		}
+	}()
 
 	fmt.Print("Enter password: ")
 	pwd, err := terminal.ReadPassword(fd)
@@ -212,6 +221,10 @@ func requestPassword(repeat bool) ([]byte, error) {
 			return nil, fmt.Errorf("passwords do not match")
 		}
 	}
+
+	// Stop receiving signals and close the channel to unblock the go-routine.
+	signal.Stop(interruptCh)
+	close(interruptCh)
 
 	return pwd, nil
 }
