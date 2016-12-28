@@ -25,28 +25,34 @@ func doCmdRun(handle string) (int, error) {
 		return 1, err
 	}
 
-	// Load the global config.
-	globalConfig := &data.Config{} // TODO
-	scryptConfig := globalConfig.Scrypt
-
-	// Verify the hash of the derived crypto key against the stored hash.
-	key, err := NewScryptKey(pwd, scryptConfig.Salt,
-		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
-	if err != nil {
-		return 1, err
-	}
-	if bytes.Compare(key.Hash(), globalConfig.Hash) != 0 {
-		return 1, fmt.Errorf("incorrect password")
-	}
-
 	// Load and parse the crypto envelope.
 	cryptoEnvMsg, err := loadCommand([]byte(handle))
 	if err != nil {
 		return 1, err
 	}
 	cryptoEnv := &data.CryptoEnvelope{}
-	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil {
+	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil ||
+		cryptoEnv.UserKey == nil || cryptoEnv.UserKey.Scrypt == nil {
 		return 1, fmt.Errorf("failed to deserialise the crypto envelope: %v", err)
+	}
+
+	// Check that we support the key derivation cipher algorithms.
+	if cryptoEnv.UserKey.Algorithm != data.KeyAlgo_SCRYPT {
+		return 1, fmt.Errorf("unsupported key derivation algorithm")
+	}
+	if cryptoEnv.Algorithm != data.CipherAlgo_AES256CTR {
+		return 1, fmt.Errorf("unsupported cipher algorithm")
+	}
+
+	// Derive the user key and verify its hash against the stored hash.
+	scryptConfig := cryptoEnv.UserKey.Scrypt
+	key, err := NewScryptKey(pwd, scryptConfig.Salt,
+		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
+	if err != nil {
+		return 1, err
+	}
+	if bytes.Compare(key.Hash(), cryptoEnv.UserKey.Hash) != 0 {
+		return 1, fmt.Errorf("incorrect password")
 	}
 
 	// Decrypt the command data.

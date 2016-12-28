@@ -3,9 +3,16 @@ syntax = "proto3";
 package cmdsafe;
 option go_package = "data";
 
-message Config {
+// The password key derivation configuration.
+message UserKey {
   bytes hash = 1;
-  ScryptConfig scrypt = 2;
+  KeyAlgo algorithm = 2;
+  ScryptConfig scrypt = 3;
+}
+
+// Supported key derivation algorithms.
+enum KeyAlgo {
+  SCRYPT = 0;
 }
 
 message ScryptConfig {
@@ -15,14 +22,22 @@ message ScryptConfig {
   int32 p = 4;
 }
 
+// Supported encryption algorithms.
+enum CipherAlgo {
+  AES256CTR = 0;
+}
+
+message CryptoEnvelope {
+  bytes hmac = 1;           // The hmac of algorithm+iv+key+data (in this order).
+  bytes iv = 2;             // The initialization vector.
+  bytes key = 3;            // The encryption key.
+  CipherAlgo algorithm = 4; // The encryption algorithm.
+  UserKey userKey = 5;      // The key derived from the user password.
+  bytes data = 6;           // The encrypted data.
+}
+
 message Command {
   string name = 1;          // A handle used to refer to this command.
   string executable = 2;    // The command executable.
   repeated string args = 3; // The command arguments.
-}
-
-message CryptoEnvelope {
-  bytes hmac = 1; // The hmac of iv+data (in this order).
-  bytes iv = 2;   // The initialization vector.
-  bytes data = 3; // The encrypted data.
 }

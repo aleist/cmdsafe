@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"hash"
+	"strconv"
 
 	"bitbucket.org/aleist/cmdsafe/protobuf/data"
 	"github.com/golang/protobuf/proto"
@@ -46,10 +47,10 @@ func (k CryptoKey) Hash() []byte {
 	return sum[:]
 }
 
-// EncryptFn is the function signature expected by EncryptCommand.
+// EncryptFn is a generic cipher function as expected by EncryptCommand.
 type EncryptFn func(key, plaintext []byte) (iv, ciphertext []byte, err error)
 
-// DecryptFn is the function signature expected by DecryptCommand.
+// DecryptFn is a generic cipher function as expected by DecryptCommand.
 type DecryptFn func(key, iv, ciphertext []byte) (plaintext []byte, err error)
 
 // EncryptAESCTR encrypts plaintext using the AES-CTR stream cipher.
@@ -67,7 +68,7 @@ func EncryptAESCTR(key, plaintext []byte) (iv, ciphertext []byte, err error) {
 	// Generate a random initialization vector and prefix it to the ciphertext.
 	iv = make([]byte, block.BlockSize())
 	if _, err := rand.Read(iv); err != nil {
-		return nil, nil, fmt.Errorf("failed to generate random cipher IV: %v", err)
+		return nil, nil, fmt.Errorf("failed to generate random initialization vector: %v", err)
 	}
 
 	// Encrypt using CTR mode.
@@ -98,12 +99,15 @@ func DecryptAESCTR(key, iv, ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// EncryptCommand is a helper that uses key.Encryption and function fn to
-// encrypt cmdData. It then signs all public data used in the encryption process
-// with an HMAC based on the hash from hashFn (e.g. sha256.New) and key.HMAC.
+// EncryptCommand is a helper that uses function fn to encrypt cmdData.
 //
-// Returns a CryptoEnvelope with the results.
-func EncryptCommand(cmdData *data.Command, key CryptoKey, fn EncryptFn,
+// A random data encryption key is generated and itself encrypted with fn and
+// userKey.Encryption. It is stored in the CryptoEnvelope.Key field with its
+// initialisation vector prefixed.
+//
+// All public data used in the encryption process is signed with an HMAC based
+// on the hash from hashFn (e.g. sha256.New) and userKey.HMAC.
+func EncryptCommand(cmdData *data.Command, userKey CryptoKey, fn EncryptFn,
 	hashFn func() hash.Hash) (*data.CryptoEnvelope, error) {
 
 	// Serialise the Command struct.
@@ -112,35 +116,65 @@ func EncryptCommand(cmdData *data.Command, key CryptoKey, fn EncryptFn,
 		return nil, fmt.Errorf("failed to marshal the command data: %v", err)
 	}
 
+	// Currently the only supported algorithm.
+	const cipherAlgo = data.CipherAlgo_AES256CTR
+
+	// Generate a random encryption key.
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("failed to generate random encryption key: %v", err)
+	}
+
 	// Encrypt the data.
-	iv, ciphertext, err := fn(key.Encryption(), cmdMsg)
+	iv, ciphertext, err := fn(key, cmdMsg)
 	if err != nil {
 		return nil, err
 	}
+
+	// Encrypt the cipher key with the user key and prefix the keyIV to it.
+	keyIV, keyCipher, err := fn(userKey.Encryption(), key)
+	if err != nil {
+		return nil, err
+	}
+	encryptedKey := make([]byte, 0, len(keyIV)+len(keyCipher))
+	encryptedKey = append(encryptedKey, keyIV...)
+	encryptedKey = append(encryptedKey, keyCipher...)
 
 	// Use an HMAC to sign all public data used in the encryption process.
-	sig, err := sign(hmac.New(hashFn, key.HMAC()), iv, ciphertext)
+	sig, err := sign(hmac.New(hashFn, userKey.HMAC()),
+		[]byte(strconv.Itoa(int(cipherAlgo))), iv, encryptedKey, ciphertext)
 	if err != nil {
 		return nil, err
 	}
 
-	return &data.CryptoEnvelope{Hmac: sig, Iv: iv, Data: ciphertext}, nil
+	return &data.CryptoEnvelope{
+		Hmac:      sig,
+		Iv:        iv,
+		Key:       encryptedKey,
+		Algorithm: cipherAlgo,
+		Data:      ciphertext,
+	}, nil
 }
 
-// DecryptCommand is a helper that verifies the HMAC in env with an HMAC based
-// on the hash from hashFn and key.HMAC. It then uses key.Encryption and
-// function fn to decrypt the command data.
+// DecryptCommand is a helper that uses function fn to decrypt a Command.
 //
-// Returns the command config.
-func DecryptCommand(env *data.CryptoEnvelope, key CryptoKey, fn DecryptFn,
+// It verifies env.HMAC with an HMAC based on the hash from hashFn and
+// userKey.HMAC. It then uses userKey.Encryption and function fn to decrypt the
+// cipher key and with it the command data.
+func DecryptCommand(env *data.CryptoEnvelope, userKey CryptoKey, fn DecryptFn,
 	hashFn func() hash.Hash) (*data.Command, error) {
 
 	if env == nil {
 		return nil, fmt.Errorf("nil crypto envelope")
 	}
+	if env.Algorithm != data.CipherAlgo_AES256CTR {
+		return nil, fmt.Errorf("unsupported cipher algorithm")
+	}
+	const cipherBlockSize = aes.BlockSize
 
 	// Verify the HMAC.
-	sig, err := sign(hmac.New(hashFn, key.HMAC()), env.Iv, env.Data)
+	sig, err := sign(hmac.New(hashFn, userKey.HMAC()),
+		[]byte(strconv.Itoa(int(env.Algorithm))), env.Iv, env.Key, env.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +182,16 @@ func DecryptCommand(env *data.CryptoEnvelope, key CryptoKey, fn DecryptFn,
 		return nil, fmt.Errorf("invalid signature, the data may have been tempered with")
 	}
 
+	// Decrypt the cipher key with the user key.
+	keyIV := env.Key[:cipherBlockSize]
+	keyCipher := env.Key[cipherBlockSize:]
+	key, err := fn(userKey.Encryption(), keyIV, keyCipher)
+	if err != nil {
+		return nil, err
+	}
+
 	// Decrypt the data.
-	plaintext, err := fn(key.Encryption(), env.Iv, env.Data)
+	plaintext, err := fn(key, env.Iv, env.Data)
 	if err != nil {
 		return nil, err
 	}

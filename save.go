@@ -3,6 +3,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 
@@ -23,19 +24,30 @@ func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error 
 		return err
 	}
 
-	// Load the global config.
-	globalConfig := &data.Config{} // TODO
-	scryptConfig := globalConfig.Scrypt
-
-	// Encrypt the command data.
+	// Derive the crypto key from the password.
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return fmt.Errorf("failed to generate the random password salt: %v", err)
+	}
+	// Use default parameters from https://godoc.org/golang.org/x/crypto/scrypt
+	scryptConfig := &data.ScryptConfig{Salt: salt, N: 16384, R: 8, P: 1}
 	key, err := NewScryptKey(pwd, scryptConfig.Salt,
 		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
 	if err != nil {
 		return err
 	}
+
+	// Encrypt the command data.
 	cryptoEnv, err := EncryptCommand(cmdData, key, EncryptAESCTR, sha256.New)
 	if err != nil {
 		return err
+	}
+
+	// Add the user key data to the envelope.
+	cryptoEnv.UserKey = &data.UserKey{
+		Algorithm: data.KeyAlgo_SCRYPT,
+		Hash:      key.Hash(),
+		Scrypt:    scryptConfig,
 	}
 
 	// Serialise the crypto envelope.
