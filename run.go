@@ -17,66 +17,87 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// doCmdRun executes subcommand 'run' and returns the spawned process' exit
-// status in addition to any other errors.
-func doCmdRun(handle string) (int, error) {
+// doCmdRun executes subcommand 'run' in one of two modes: if detached, it
+// returns immediately after starting the child process; if not-detached, it
+// waits for the child process to exit and returns the child's exit code in
+// addition to any other errors.
+func doCmdRun(handle string, detached bool) (int, error) {
 	pwd, err := requestPassword(false)
 	if err != nil {
 		return 1, err
 	}
 
-	// Load and parse the crypto envelope.
-	cryptoEnvMsg, err := loadCommand([]byte(handle))
+	cmdData, err := retrieveCommandData(handle, pwd)
 	if err != nil {
 		return 1, err
-	}
-	cryptoEnv := &data.CryptoEnvelope{}
-	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil ||
-		cryptoEnv.UserKey == nil || cryptoEnv.UserKey.Scrypt == nil {
-		return 1, fmt.Errorf("failed to deserialise the crypto envelope: %v", err)
-	}
-
-	// Check that we support the key derivation cipher algorithms.
-	if cryptoEnv.UserKey.Algorithm != data.KeyAlgo_SCRYPT {
-		return 1, fmt.Errorf("unsupported key derivation algorithm")
-	}
-	if cryptoEnv.Algorithm != data.CipherAlgo_AES256CTR {
-		return 1, fmt.Errorf("unsupported cipher algorithm")
-	}
-
-	// Derive the user key and verify its hash against the stored hash.
-	scryptConfig := cryptoEnv.UserKey.Scrypt
-	key, err := NewScryptKey(pwd, scryptConfig.Salt,
-		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
-	if err != nil {
-		return 1, err
-	}
-	if bytes.Compare(key.Hash(), cryptoEnv.UserKey.Hash) != 0 {
-		return 1, fmt.Errorf("incorrect password")
-	}
-
-	// Decrypt the command data.
-	cmdData, err := DecryptCommand(cryptoEnv, key, DecryptAESCTR, sha256.New)
-	if err != nil {
-		return 1, err
-	}
-
-	// Verify that the stored command name matches the handle to ensure the DB
-	// has not been tampered with and the command belongs to a different handle.
-	if cmdData.Name != handle {
-		return 1, fmt.Errorf("command name mismatch, the database may have been tempered with")
 	}
 
 	// Run the command.
-	status, err := runCmd(cmdData.Executable, cmdData.Args...)
+	var status int
+	if detached {
+		if e := exec.Command(cmdData.Executable, cmdData.Args...).Start(); e != nil {
+			err = fmt.Errorf("failed to start: %v", e)
+		}
+	} else {
+		status, err = runCmd(cmdData.Executable, cmdData.Args...)
+	}
 	if err != nil {
 		return status, fmt.Errorf("%s %v", handle, err)
 	}
 	return status, nil
 }
 
-// loadCommand loads the command data stored in the DB under handle.
-func loadCommand(handle []byte) ([]byte, error) {
+// retrieveCommandData loads the encrypted data stored under handle in the DB
+// and attempts to decrypt it with password. Returns the decrypted data or an
+// error if the password is incorrect or something else is wrong.
+func retrieveCommandData(handle string, password []byte) (*data.Command, error) {
+	// Load and parse the crypto envelope.
+	cryptoEnvMsg, err := loadCommandData([]byte(handle))
+	if err != nil {
+		return nil, err
+	}
+	cryptoEnv := &data.CryptoEnvelope{}
+	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil ||
+		cryptoEnv.UserKey == nil || cryptoEnv.UserKey.Scrypt == nil {
+		return nil, fmt.Errorf("failed to deserialise the crypto envelope: %v", err)
+	}
+
+	// Check that we support the key derivation cipher algorithms.
+	if cryptoEnv.UserKey.Algorithm != data.KeyAlgo_SCRYPT {
+		return nil, fmt.Errorf("unsupported key derivation algorithm")
+	}
+	if cryptoEnv.Algorithm != data.CipherAlgo_AES256CTR {
+		return nil, fmt.Errorf("unsupported cipher algorithm")
+	}
+
+	// Derive the user key and verify its hash against the stored hash.
+	scryptConfig := cryptoEnv.UserKey.Scrypt
+	key, err := NewScryptKey(password, scryptConfig.Salt,
+		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Compare(key.Hash(), cryptoEnv.UserKey.Hash) != 0 {
+		return nil, fmt.Errorf("incorrect password")
+	}
+
+	// Decrypt the command data.
+	cmdData, err := DecryptCommand(cryptoEnv, key, DecryptAESCTR, sha256.New)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify that the stored command name matches the handle to ensure the DB
+	// has not been tampered with and the command belongs to a different handle.
+	if cmdData.Name != handle {
+		return nil, fmt.Errorf("command name mismatch, the database may have been tempered with")
+	}
+
+	return cmdData, nil
+}
+
+// loadCommandData loads the unprocessed command data from key handle in the DB.
+func loadCommandData(handle []byte) ([]byte, error) {
 	entryNotFoundError := fmt.Errorf("%s not found", handle)
 
 	var value []byte

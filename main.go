@@ -53,8 +53,8 @@ func main() {
 		// No arguments to parse.
 		err = doCmdList()
 	case runCommand:
-		cmdHandle := parseArgsCmdRun(subargs)
-		status, err = doCmdRun(cmdHandle)
+		cmdHandle, detached := parseArgsCmdRun(subargs)
+		status, err = doCmdRun(cmdHandle, detached)
 	case saveCommand:
 		cmdHandle, cmdData, config := parseArgsCmdSave(subargs)
 		err = doCmdSave(cmdHandle, cmdData, config)
@@ -82,7 +82,7 @@ func parseArgs() (command, []string) {
 
 	// Define the usage message.
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [global flags, ...] command [flags, ...]\n\n", progName)
+		fmt.Fprintf(os.Stderr, "Usage: %s [global flags ...] command [flags ...]\n\n", progName)
 		fmt.Fprintln(os.Stderr, "Global flags:")
 		flag.PrintDefaults()
 		fmt.Fprintln(os.Stderr, "\nThe commands are:")
@@ -117,13 +117,20 @@ func parseArgsCmdDelete(args []string) (cmdHandle string) {
 }
 
 // parseArgsCmdRun parses arguments specific to subcommand 'run'. Returns the
-// handle for the external command to be run.
-func parseArgsCmdRun(args []string) (cmdHandle string) {
-	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "Usage: run <cmd name>\n")
+// handle for the external command to be run and the run mode.
+func parseArgsCmdRun(args []string) (cmdHandle string, detached bool) {
+	flags := flag.NewFlagSet("run", flag.ExitOnError)
+
+	flags.BoolVar(&detached, "d", false, "Run the command in detached mode")
+
+	err := flags.Parse(args)
+	cmdArgs := flags.Args()
+	if err != nil || len(cmdArgs) < 1 {
+		fmt.Fprintf(os.Stderr, "Usage: run [-d] <cmd name>\n")
+		flags.PrintDefaults()
 		os.Exit(2)
 	}
-	return args[0]
+	return cmdArgs[0], detached
 }
 
 // parseArgsCmdSave parses arguments specific to subcommand 'save'. Returns the
@@ -139,7 +146,7 @@ func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *data.Command, c
 	err := flags.Parse(args)
 	cmdArgs := flags.Args()
 	if err != nil || cmdHandle == "" || len(cmdArgs) < 1 {
-		fmt.Fprintf(os.Stderr, "Usage: save [-r] -name <name> <cmd> [<cmd args>, ...]\n")
+		fmt.Fprintf(os.Stderr, "Usage: save [-r] -name <name> <cmd> [<cmd args> ...]\n")
 		flags.PrintDefaults()
 		os.Exit(2)
 	}
