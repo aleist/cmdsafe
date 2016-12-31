@@ -28,6 +28,7 @@ type command string
 const (
 	deleteCommand command = "delete"
 	listCommand   command = "list"
+	printCommand  command = "print"
 	runCommand    command = "run"
 	saveCommand   command = "save"
 )
@@ -52,6 +53,9 @@ func main() {
 	case listCommand:
 		// No arguments to parse.
 		err = doCmdList()
+	case printCommand:
+		cmdHandle := parseArgsCmdPrint(subargs)
+		err = doCmdPrint(cmdHandle)
 	case runCommand:
 		cmdHandle, detached := parseArgsCmdRun(subargs)
 		status, err = doCmdRun(cmdHandle, detached)
@@ -88,6 +92,7 @@ func parseArgs() (command, []string) {
 		fmt.Fprintln(os.Stderr, "\nThe commands are:")
 		fmt.Fprintln(os.Stderr, "  delete\tdelete a saved cmd")
 		fmt.Fprintln(os.Stderr, "  list  \tlist all saved cmds")
+		fmt.Fprintln(os.Stderr, "  print \tprint the cmd configuration to stdout")
 		fmt.Fprintln(os.Stderr, "  run   \trun a saved cmd")
 		fmt.Fprintln(os.Stderr, "  save  \tsave a new or update an existing cmd")
 	}
@@ -111,6 +116,16 @@ func parseArgs() (command, []string) {
 func parseArgsCmdDelete(args []string) (cmdHandle string) {
 	if len(args) != 1 {
 		fmt.Fprintf(os.Stderr, "Usage: delete <cmd name>\n")
+		os.Exit(2)
+	}
+	return args[0]
+}
+
+// parseArgsCmdPrint parses arguments specific to subcommand 'print'. Returns
+// the handle for the external command to be printed.
+func parseArgsCmdPrint(args []string) (cmdHandle string) {
+	if len(args) != 1 {
+		fmt.Fprintf(os.Stderr, "Usage: print <cmd name>\n")
 		os.Exit(2)
 	}
 	return args[0]

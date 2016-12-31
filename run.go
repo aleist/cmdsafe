@@ -1,4 +1,4 @@
-// This file implements subcommand 'run'.
+// This file implements subcommands 'run' and 'print'.
 
 package main
 
@@ -45,6 +45,28 @@ func doCmdRun(handle string, detached bool) (int, error) {
 		return status, fmt.Errorf("%s %v", handle, err)
 	}
 	return status, nil
+}
+
+// doCmdPrint executes subcommand 'print', printing the configuration of the
+// command identified by handle to stdout.
+func doCmdPrint(handle string) error {
+	pwd, err := requestPassword(false)
+	if err != nil {
+		return err
+	}
+
+	cmdData, err := retrieveCommandData(handle, pwd)
+	if err != nil {
+		return err
+	}
+
+	fmt.Print(handle, ": ", cmdData.Executable)
+	for _, arg := range cmdData.Args {
+		fmt.Print(" ", arg)
+	}
+	fmt.Println()
+
+	return nil
 }
 
 // retrieveCommandData loads the encrypted data stored under handle in the DB
