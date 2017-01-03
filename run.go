@@ -17,11 +17,16 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+type runOptions struct {
+	Args     []string // Additional arguments to the saved command.
+	Detached bool     // Detached mode switch.
+}
+
 // doCmdRun executes subcommand 'run' in one of two modes: if detached, it
 // returns immediately after starting the child process; if not-detached, it
 // waits for the child process to exit and returns the child's exit code in
 // addition to any other errors.
-func doCmdRun(handle string, detached bool) (int, error) {
+func doCmdRun(handle string, config *runOptions) (int, error) {
 	pwd, err := requestPassword(false)
 	if err != nil {
 		return 1, err
@@ -32,9 +37,14 @@ func doCmdRun(handle string, detached bool) (int, error) {
 		return 1, err
 	}
 
+	// Append additional one-off arguments to the saved ones.
+	if len(config.Args) > 0 {
+		cmdData.Args = append(cmdData.Args, config.Args...)
+	}
+
 	// Run the command.
 	var status int
-	if detached {
+	if config.Detached {
 		if e := exec.Command(cmdData.Executable, cmdData.Args...).Start(); e != nil {
 			err = fmt.Errorf("failed to start: %v", e)
 		}

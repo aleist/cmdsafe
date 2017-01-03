@@ -57,8 +57,8 @@ func main() {
 		cmdHandle := parseArgsCmdPrint(subargs)
 		err = doCmdPrint(cmdHandle)
 	case runCommand:
-		cmdHandle, detached := parseArgsCmdRun(subargs)
-		status, err = doCmdRun(cmdHandle, detached)
+		cmdHandle, config := parseArgsCmdRun(subargs)
+		status, err = doCmdRun(cmdHandle, config)
 	case saveCommand:
 		cmdHandle, cmdData, config := parseArgsCmdSave(subargs)
 		err = doCmdSave(cmdHandle, cmdData, config)
@@ -132,11 +132,12 @@ func parseArgsCmdPrint(args []string) (cmdHandle string) {
 }
 
 // parseArgsCmdRun parses arguments specific to subcommand 'run'. Returns the
-// handle for the external command to be run and the run mode.
-func parseArgsCmdRun(args []string) (cmdHandle string, detached bool) {
+// handle for the external command to be run and additional run options.
+func parseArgsCmdRun(args []string) (cmdHandle string, config *runOptions) {
 	flags := flag.NewFlagSet("run", flag.ExitOnError)
 
-	flags.BoolVar(&detached, "d", false, "Run the command in detached mode")
+	config = &runOptions{}
+	flags.BoolVar(&config.Detached, "d", false, "Run the command in detached mode")
 
 	err := flags.Parse(args)
 	cmdArgs := flags.Args()
@@ -145,7 +146,8 @@ func parseArgsCmdRun(args []string) (cmdHandle string, detached bool) {
 		flags.PrintDefaults()
 		os.Exit(2)
 	}
-	return cmdArgs[0], detached
+	config.Args = cmdArgs[1:]
+	return cmdArgs[0], config
 }
 
 // parseArgsCmdSave parses arguments specific to subcommand 'save'. Returns the
@@ -154,7 +156,6 @@ func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *data.Command, c
 	flags := flag.NewFlagSet("save", flag.ExitOnError)
 
 	config = &saveOptions{}
-
 	flags.StringVar(&cmdHandle, "name", "", "The name used to refer to the saved cmd")
 	flags.BoolVar(&config.Replace, "r", false, "Replace existing entry with the given name")
 

@@ -57,12 +57,12 @@ func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error 
 	}
 
 	// Write to DB.
-	return accessDB(false, writeCommand([]byte(handle), cryptoEnvMsg, config))
+	return accessDB(false, writeCommand([]byte(handle), cryptoEnvMsg, config.Replace))
 }
 
 // writeCommand returns a closure that saves the command data value under key
 // handle in the DB.
-func writeCommand(handle, value []byte, config *saveOptions) func(*bolt.DB) error {
+func writeCommand(handle, value []byte, replace bool) func(*bolt.DB) error {
 	return func(db *bolt.DB) error {
 		if err := createBuckets(db); err != nil {
 			return err
@@ -73,7 +73,7 @@ func writeCommand(handle, value []byte, config *saveOptions) func(*bolt.DB) erro
 
 			// Check if entry already exists; only replace if explicitly requested.
 			old := cmdBucket.Get(handle)
-			if old != nil && !config.Replace {
+			if old != nil && !replace {
 				return fmt.Errorf("cannot replace existing entry for %s without -r flag", handle)
 			}
 
