@@ -12,7 +12,8 @@ import (
 	"hash"
 	"strconv"
 
-	"bitbucket.org/aleist/cmdsafe/protobuf/data"
+	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
+	"bitbucket.org/aleist/cmdsafe/protobuf/crypto"
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/crypto/scrypt"
 )
@@ -107,8 +108,8 @@ func DecryptAESCTR(key, iv, ciphertext []byte) ([]byte, error) {
 //
 // All public data used in the encryption process is signed with an HMAC based
 // on the hash from hashFn (e.g. sha256.New) and userKey.HMAC.
-func EncryptCommand(cmdData *data.Command, userKey CryptoKey, fn EncryptFn,
-	hashFn func() hash.Hash) (*data.CryptoEnvelope, error) {
+func EncryptCommand(cmdData *cmdsafe.Command, userKey CryptoKey, fn EncryptFn,
+	hashFn func() hash.Hash) (*crypto.CryptoEnvelope, error) {
 
 	// Serialise the Command struct.
 	cmdMsg, err := proto.Marshal(cmdData)
@@ -117,7 +118,7 @@ func EncryptCommand(cmdData *data.Command, userKey CryptoKey, fn EncryptFn,
 	}
 
 	// Currently the only supported algorithm.
-	const cipherAlgo = data.CipherAlgo_AES256CTR
+	const cipherAlgo = crypto.CipherAlgo_AES256CTR
 
 	// Generate a random encryption key.
 	key := make([]byte, 32)
@@ -147,7 +148,7 @@ func EncryptCommand(cmdData *data.Command, userKey CryptoKey, fn EncryptFn,
 		return nil, err
 	}
 
-	return &data.CryptoEnvelope{
+	return &crypto.CryptoEnvelope{
 		Hmac:      sig,
 		Iv:        iv,
 		Key:       encryptedKey,
@@ -161,13 +162,13 @@ func EncryptCommand(cmdData *data.Command, userKey CryptoKey, fn EncryptFn,
 // It verifies env.HMAC with an HMAC based on the hash from hashFn and
 // userKey.HMAC. It then uses userKey.Encryption and function fn to decrypt the
 // cipher key and with it the command data.
-func DecryptCommand(env *data.CryptoEnvelope, userKey CryptoKey, fn DecryptFn,
-	hashFn func() hash.Hash) (*data.Command, error) {
+func DecryptCommand(env *crypto.CryptoEnvelope, userKey CryptoKey, fn DecryptFn,
+	hashFn func() hash.Hash) (*cmdsafe.Command, error) {
 
 	if env == nil {
 		return nil, fmt.Errorf("nil crypto envelope")
 	}
-	if env.Algorithm != data.CipherAlgo_AES256CTR {
+	if env.Algorithm != crypto.CipherAlgo_AES256CTR {
 		return nil, fmt.Errorf("unsupported cipher algorithm")
 	}
 	const cipherBlockSize = aes.BlockSize
@@ -197,7 +198,7 @@ func DecryptCommand(env *data.CryptoEnvelope, userKey CryptoKey, fn DecryptFn,
 	}
 
 	// Parse the command data.
-	cmdData := &data.Command{}
+	cmdData := &cmdsafe.Command{}
 	if err := proto.Unmarshal(plaintext, cmdData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the command data: %v", err)
 	}

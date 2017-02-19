@@ -1,0 +1,12 @@
+// cmdsafe specific message definitions.
+
+syntax = "proto3";
+
+package cmdsafe;
+option go_package = "cmdsafe";
+
+message Command {
+  string name = 1;          // A handle used to refer to this command.
+  string executable = 2;    // The command executable.
+  repeated string args = 3; // The command arguments.
+}

@@ -7,7 +7,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"bitbucket.org/aleist/cmdsafe/protobuf/data"
+	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
+	"bitbucket.org/aleist/cmdsafe/protobuf/crypto"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -18,7 +19,7 @@ type saveOptions struct {
 
 // doCmdSave executes subcommand 'save', storing cmdData in encrypted form with
 // handle as its identifier.
-func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error {
+func doCmdSave(handle string, cmdData *cmdsafe.Command, config *saveOptions) error {
 	pwd, err := requestPassword(true)
 	if err != nil {
 		return err
@@ -30,7 +31,7 @@ func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error 
 		return fmt.Errorf("failed to generate the random password salt: %v", err)
 	}
 	// Use default parameters from https://godoc.org/golang.org/x/crypto/scrypt
-	scryptConfig := &data.ScryptConfig{Salt: salt, N: 16384, R: 8, P: 1}
+	scryptConfig := &crypto.ScryptConfig{Salt: salt, N: 16384, R: 8, P: 1}
 	key, err := NewScryptKey(pwd, scryptConfig.Salt,
 		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
 	if err != nil {
@@ -44,8 +45,8 @@ func doCmdSave(handle string, cmdData *data.Command, config *saveOptions) error 
 	}
 
 	// Add the user key data to the envelope.
-	cryptoEnv.UserKey = &data.UserKey{
-		Algorithm: data.KeyAlgo_SCRYPT,
+	cryptoEnv.UserKey = &crypto.UserKey{
+		Algorithm: crypto.KeyAlgo_SCRYPT,
 		Hash:      key.Hash(),
 		Scrypt:    scryptConfig,
 	}

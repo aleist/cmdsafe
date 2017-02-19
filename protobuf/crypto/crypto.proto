@@ -1,7 +1,9 @@
+// Message definitions for generic blobs of encrypted and authenticated data.
+
 syntax = "proto3";
 
 package cmdsafe;
-option go_package = "data";
+option go_package = "crypto";
 
 // The password key derivation configuration.
 message UserKey {
@@ -34,10 +36,4 @@ message CryptoEnvelope {
   CipherAlgo algorithm = 4; // The encryption algorithm.
   UserKey user_key = 5;     // The key derived from the user password.
   bytes data = 6;           // The encrypted data.
-}
-
-message Command {
-  string name = 1;          // A handle used to refer to this command.
-  string executable = 2;    // The command executable.
-  repeated string args = 3; // The command arguments.
 }

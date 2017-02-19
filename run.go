@@ -12,7 +12,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"bitbucket.org/aleist/cmdsafe/protobuf/data"
+	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
+	"bitbucket.org/aleist/cmdsafe/protobuf/crypto"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -82,23 +83,23 @@ func doCmdPrint(handle string) error {
 // retrieveCommandData loads the encrypted data stored under handle in the DB
 // and attempts to decrypt it with password. Returns the decrypted data or an
 // error if the password is incorrect or something else is wrong.
-func retrieveCommandData(handle string, password []byte) (*data.Command, error) {
+func retrieveCommandData(handle string, password []byte) (*cmdsafe.Command, error) {
 	// Load and parse the crypto envelope.
 	cryptoEnvMsg, err := loadCommandData([]byte(handle))
 	if err != nil {
 		return nil, err
 	}
-	cryptoEnv := &data.CryptoEnvelope{}
+	cryptoEnv := &crypto.CryptoEnvelope{}
 	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil ||
 		cryptoEnv.UserKey == nil || cryptoEnv.UserKey.Scrypt == nil {
 		return nil, fmt.Errorf("failed to deserialise the crypto envelope: %v", err)
 	}
 
 	// Check that we support the key derivation cipher algorithms.
-	if cryptoEnv.UserKey.Algorithm != data.KeyAlgo_SCRYPT {
+	if cryptoEnv.UserKey.Algorithm != crypto.KeyAlgo_SCRYPT {
 		return nil, fmt.Errorf("unsupported key derivation algorithm")
 	}
-	if cryptoEnv.Algorithm != data.CipherAlgo_AES256CTR {
+	if cryptoEnv.Algorithm != crypto.CipherAlgo_AES256CTR {
 		return nil, fmt.Errorf("unsupported cipher algorithm")
 	}
 
