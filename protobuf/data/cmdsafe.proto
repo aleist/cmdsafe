@@ -32,7 +32,7 @@ message CryptoEnvelope {
   bytes iv = 2;             // The initialization vector.
   bytes key = 3;            // The encryption key.
   CipherAlgo algorithm = 4; // The encryption algorithm.
-  UserKey userKey = 5;      // The key derived from the user password.
+  UserKey user_key = 5;     // The key derived from the user password.
   bytes data = 6;           // The encrypted data.
 }
 
