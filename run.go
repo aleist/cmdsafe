@@ -12,8 +12,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"bitbucket.org/aleist/cmdsafe/crypto"
 	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
-	"bitbucket.org/aleist/cmdsafe/protobuf/crypto"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -105,7 +105,7 @@ func retrieveCommandData(handle string, password []byte) (*cmdsafe.Command, erro
 
 	// Derive the user key and verify its hash against the stored hash.
 	scryptConfig := cryptoEnv.UserKey.Scrypt
-	key, err := NewScryptKey(password, scryptConfig.Salt,
+	key, err := crypto.NewScryptKey(password, scryptConfig.Salt,
 		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func retrieveCommandData(handle string, password []byte) (*cmdsafe.Command, erro
 	}
 
 	// Decrypt the command data.
-	cmdData, err := DecryptCommand(cryptoEnv, key, DecryptAESCTR, sha256.New)
+	cmdData, err := DecryptCommand(cryptoEnv, key, crypto.DecryptAESCTR, sha256.New)
 	if err != nil {
 		return nil, err
 	}

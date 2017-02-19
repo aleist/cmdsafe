@@ -7,8 +7,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"bitbucket.org/aleist/cmdsafe/crypto"
 	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
-	"bitbucket.org/aleist/cmdsafe/protobuf/crypto"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -32,14 +32,14 @@ func doCmdSave(handle string, cmdData *cmdsafe.Command, config *saveOptions) err
 	}
 	// Use default parameters from https://godoc.org/golang.org/x/crypto/scrypt
 	scryptConfig := &crypto.ScryptConfig{Salt: salt, N: 16384, R: 8, P: 1}
-	key, err := NewScryptKey(pwd, scryptConfig.Salt,
+	key, err := crypto.NewScryptKey(pwd, scryptConfig.Salt,
 		int(scryptConfig.N), int(scryptConfig.R), int(scryptConfig.P))
 	if err != nil {
 		return err
 	}
 
 	// Encrypt the command data.
-	cryptoEnv, err := EncryptCommand(cmdData, key, EncryptAESCTR, sha256.New)
+	cryptoEnv, err := EncryptCommand(cmdData, key, crypto.EncryptAESCTR, sha256.New)
 	if err != nil {
 		return err
 	}
