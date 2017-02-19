@@ -66,7 +66,7 @@ func EncryptAESCTR(key, plaintext []byte) (iv, ciphertext []byte, err error) {
 		return nil, nil, err
 	}
 
-	// Generate a random initialization vector and prefix it to the ciphertext.
+	// Generate a random initialization vector.
 	iv = make([]byte, block.BlockSize())
 	if _, err := rand.Read(iv); err != nil {
 		return nil, nil, fmt.Errorf("failed to generate random initialization vector: %v", err)
