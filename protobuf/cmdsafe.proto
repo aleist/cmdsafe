@@ -3,7 +3,7 @@
 syntax = "proto3";
 
 package cmdsafe;
-option go_package = "cmdsafe";
+option go_package = "main";
 
 message Command {
   string name = 1;          // A handle used to refer to this command.

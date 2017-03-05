@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"bitbucket.org/aleist/cmdsafe/crypto"
-	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -19,7 +18,7 @@ type saveOptions struct {
 
 // doCmdSave executes subcommand 'save', storing cmdData in encrypted form with
 // handle as its identifier.
-func doCmdSave(handle string, cmdData *cmdsafe.Command, config *saveOptions) error {
+func doCmdSave(handle string, cmdData *Command, config *saveOptions) error {
 	pwd, err := requestPassword(true)
 	if err != nil {
 		return err

@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
 	"github.com/boltdb/bolt"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -152,7 +151,7 @@ func parseArgsCmdRun(args []string) (cmdHandle string, config *runOptions) {
 
 // parseArgsCmdSave parses arguments specific to subcommand 'save'. Returns the
 // handle for the external command to be saved, its data and the save config.
-func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *cmdsafe.Command,
+func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *Command,
 	config *saveOptions) {
 
 	flags := flag.NewFlagSet("save", flag.ExitOnError)
@@ -170,7 +169,7 @@ func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *cmdsafe.Command
 	}
 
 	// Init the external command struct.
-	cmdData = &cmdsafe.Command{}
+	cmdData = &Command{}
 	cmdData.Name = cmdHandle
 	cmdData.Executable = cmdArgs[0]
 	if len(cmdArgs) > 1 {

@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"bitbucket.org/aleist/cmdsafe/crypto"
-	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -83,7 +82,7 @@ func doCmdPrint(handle string) error {
 // retrieveCommandData loads the encrypted data stored under handle in the DB
 // and attempts to decrypt it with password. Returns the decrypted data or an
 // error if the password is incorrect or something else is wrong.
-func retrieveCommandData(handle string, password []byte) (*cmdsafe.Command, error) {
+func retrieveCommandData(handle string, password []byte) (*Command, error) {
 	// Load and parse the crypto envelope.
 	cryptoEnvMsg, err := loadCommandData([]byte(handle))
 	if err != nil {

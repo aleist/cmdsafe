@@ -7,13 +7,12 @@ import (
 	"hash"
 
 	"bitbucket.org/aleist/cmdsafe/crypto"
-	"bitbucket.org/aleist/cmdsafe/protobuf/cmdsafe"
 	"github.com/golang/protobuf/proto"
 )
 
 // EncryptCommand serialises cmdData and then encrypts it with crypto.Encrypt.
 // See the latter for details on the parameters.
-func EncryptCommand(cmdData *cmdsafe.Command, userKey crypto.Key, fn crypto.EncryptFn,
+func EncryptCommand(cmdData *Command, userKey crypto.Key, fn crypto.EncryptFn,
 	hashFn func() hash.Hash) (*crypto.CryptoEnvelope, error) {
 
 	plaintext, err := proto.Marshal(cmdData)
@@ -27,14 +26,14 @@ func EncryptCommand(cmdData *cmdsafe.Command, userKey crypto.Key, fn crypto.Encr
 // DecryptCommand decrypts the Command in env.Data with crypto.Decrypt.
 // See the latter for details on the parameters.
 func DecryptCommand(env *crypto.CryptoEnvelope, userKey crypto.Key, fn crypto.DecryptFn,
-	hashFn func() hash.Hash) (*cmdsafe.Command, error) {
+	hashFn func() hash.Hash) (*Command, error) {
 
 	plaintext, err := crypto.Decrypt(env, userKey, fn, hashFn)
 	if err != nil {
 		return nil, err
 	}
 
-	cmdData := &cmdsafe.Command{}
+	cmdData := &Command{}
 	if err := proto.Unmarshal(plaintext, cmdData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the command data: %v", err)
 	}
