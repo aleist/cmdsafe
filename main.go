@@ -62,7 +62,7 @@ func main() {
 		cmdHandle, cmdData, config := parseArgsCmdSave(subargs)
 		err = doCmdSave(cmdHandle, cmdData, config)
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", subcmd)
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\n", subcmd)
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -85,15 +85,15 @@ func parseArgs() (command, []string) {
 
 	// Define the usage message.
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [global flags ...] command [flags ...]\n\n", progName)
-		fmt.Fprintln(os.Stderr, "Global flags:")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: %s [global flags ...] command [flags ...]\n\n", progName)
+		_, _ = fmt.Fprintln(os.Stderr, "Global flags:")
 		flag.PrintDefaults()
-		fmt.Fprintln(os.Stderr, "\nThe commands are:")
-		fmt.Fprintln(os.Stderr, "  delete\tdelete a saved cmd")
-		fmt.Fprintln(os.Stderr, "  list  \tlist all saved cmds")
-		fmt.Fprintln(os.Stderr, "  print \tprint the cmd configuration to stdout")
-		fmt.Fprintln(os.Stderr, "  run   \trun a saved cmd")
-		fmt.Fprintln(os.Stderr, "  save  \tsave a new or update an existing cmd")
+		_, _ = fmt.Fprintln(os.Stderr, "\nThe commands are:")
+		_, _ = fmt.Fprintln(os.Stderr, "  delete\tdelete a saved command")
+		_, _ = fmt.Fprintln(os.Stderr, "  list  \tlist all saved commands")
+		_, _ = fmt.Fprintln(os.Stderr, "  print \tprint a command configuration to stdout")
+		_, _ = fmt.Fprintln(os.Stderr, "  run   \trun a saved command")
+		_, _ = fmt.Fprintln(os.Stderr, "  save  \tsave a new or update an existing command")
 	}
 
 	// Parse general arguments.
@@ -103,7 +103,6 @@ func parseArgs() (command, []string) {
 	// Extract the subcommand.
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: missing command name\n")
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -114,7 +113,7 @@ func parseArgs() (command, []string) {
 // the handle for the external command to be deleted.
 func parseArgsCmdDelete(args []string) (cmdHandle string) {
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "Usage: delete <cmd name>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: delete <cmd name>\n")
 		os.Exit(2)
 	}
 	return args[0]
@@ -124,7 +123,7 @@ func parseArgsCmdDelete(args []string) (cmdHandle string) {
 // the handle for the external command to be printed.
 func parseArgsCmdPrint(args []string) (cmdHandle string) {
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "Usage: print <cmd name>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: print <cmd name>\n")
 		os.Exit(2)
 	}
 	return args[0]
@@ -141,7 +140,7 @@ func parseArgsCmdRun(args []string) (cmdHandle string, config *runOptions) {
 	err := flags.Parse(args)
 	cmdArgs := flags.Args()
 	if err != nil || len(cmdArgs) < 1 {
-		fmt.Fprintf(os.Stderr, "Usage: run [-d] <cmd name>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: run [-d] <cmd name> [<cmd args> ...]\n")
 		flags.PrintDefaults()
 		os.Exit(2)
 	}
@@ -163,7 +162,7 @@ func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *Command,
 	err := flags.Parse(args)
 	cmdArgs := flags.Args()
 	if err != nil || cmdHandle == "" || len(cmdArgs) < 1 {
-		fmt.Fprintf(os.Stderr, "Usage: save [-r] -name <name> <cmd> [<cmd args> ...]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: save [-r] -name <name> <cmd> [<cmd args> ...]\n")
 		flags.PrintDefaults()
 		os.Exit(2)
 	}
