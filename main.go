@@ -224,11 +224,17 @@ func requestPassword(repeat bool) ([]byte, error) {
 	signal.Notify(interruptCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		_, interrupted := <-interruptCh
-		terminal.Restore(fd, state)
+		err := terminal.Restore(fd, state)
+		if err != nil {
+			log.Print("Warning: failed to restore the terminal: ", err)
+		}
 		if interrupted {
 			os.Exit(1)
 		}
 	}()
+	// Stop receiving signals and close the channel to unblock the go-routine on return.
+	defer close(interruptCh)
+	defer signal.Stop(interruptCh)
 
 	fmt.Print("Enter password: ")
 	pwd, err := terminal.ReadPassword(fd)
@@ -245,10 +251,6 @@ func requestPassword(repeat bool) ([]byte, error) {
 			return nil, fmt.Errorf("passwords do not match")
 		}
 	}
-
-	// Stop receiving signals and close the channel to unblock the go-routine.
-	signal.Stop(interruptCh)
-	close(interruptCh)
 
 	return pwd, nil
 }
