@@ -105,7 +105,7 @@ func DecryptAESCTR(key, iv, ciphertext []byte) ([]byte, error) {
 // All public data used in the encryption process is signed with an HMAC based
 // on the hash from hashFn (e.g. sha256.New) and userKey.HMAC.
 func Encrypt(plaintext []byte, userKey Key, fn EncryptFn,
-	hashFn func() hash.Hash) (*CryptoEnvelope, error) {
+		hashFn func() hash.Hash) (*CryptoEnvelope, error) {
 
 	// Currently the only supported algorithm.
 	const cipherAlgo = CipherAlgo_AES256CTR
@@ -153,7 +153,7 @@ func Encrypt(plaintext []byte, userKey Key, fn EncryptFn,
 // userKey.HMAC. It then uses userKey.Encryption and function fn to decrypt the
 // cipher key and with it the command data.
 func Decrypt(env *CryptoEnvelope, userKey Key, fn DecryptFn,
-	hashFn func() hash.Hash) ([]byte, error) {
+		hashFn func() hash.Hash) ([]byte, error) {
 
 	if env == nil {
 		return nil, fmt.Errorf("nil crypto envelope")

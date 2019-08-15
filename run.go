@@ -12,7 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"bitbucket.org/aleist/cmdsafe/crypto"
+	"github.com/aleist/cmdsafe/crypto"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )
@@ -90,7 +90,7 @@ func retrieveCommandData(handle string, password []byte) (*Command, error) {
 	}
 	cryptoEnv := &crypto.CryptoEnvelope{}
 	if err := proto.Unmarshal(cryptoEnvMsg, cryptoEnv); err != nil ||
-		cryptoEnv.UserKey == nil || cryptoEnv.UserKey.Scrypt == nil {
+			cryptoEnv.UserKey == nil || cryptoEnv.UserKey.Scrypt == nil {
 		return nil, fmt.Errorf("failed to deserialise the crypto envelope: %v", err)
 	}
 

@@ -7,7 +7,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"bitbucket.org/aleist/cmdsafe/crypto"
+	"github.com/aleist/cmdsafe/crypto"
 	"github.com/boltdb/bolt"
 	"github.com/golang/protobuf/proto"
 )

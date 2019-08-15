@@ -2,8 +2,11 @@
 
 package main
 
-import "fmt"
-import "github.com/boltdb/bolt"
+import (
+	"fmt"
+
+	"github.com/boltdb/bolt"
+)
 
 // doCmdDelete executes subcommand 'delete', removing the key handle and its
 // associated data from the DB.

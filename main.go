@@ -152,7 +152,7 @@ func parseArgsCmdRun(args []string) (cmdHandle string, config *runOptions) {
 // parseArgsCmdSave parses arguments specific to subcommand 'save'. Returns the
 // handle for the external command to be saved, its data and the save config.
 func parseArgsCmdSave(args []string) (cmdHandle string, cmdData *Command,
-	config *saveOptions) {
+		config *saveOptions) {
 
 	flags := flag.NewFlagSet("save", flag.ExitOnError)
 
