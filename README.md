@@ -5,9 +5,6 @@ encrypted format. These commands can then be executed with those arguments autom
 plus any additional arguments passed to the run command - without having to manually copy the
 passphrase from a separate password manager.
 
-**Note: This was a small side project of mine that supports the desired functionality and is
-currently not under active development!**
-
 ## Getting Started
 
 ### Installing
@@ -41,7 +38,7 @@ The commands are:
 
 This shows the subcommands used to save, run and manage command configurations. Each command
 configuration is given a name, which itself is not encrypted and should therefore not contain any
-confidential information. This is used as a handle for the actual executable name (e.g. sshpass) and
+sensitive information. This is used as a handle for the actual executable name (e.g. sshpass) and
 arguments. This also means that multiple different configurations can be saved for a given
 executable.
 
